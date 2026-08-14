@@ -1,0 +1,17 @@
+{
+  "name": "ghost-publish",
+  "version": "1.0.0",
+  "description": "Publish, update, schedule and verify Ghost posts from a markdown file, driving TryGhost's official ghst CLI. Strips front matter Ghost would render as prose, and diffs what Ghost actually stored against the source in both directions.",
+  "skills": [
+    "./ghost-publish"
+  ],
+  "interface": {
+    "displayName": "Ghost Publish",
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Publish this markdown file to my Ghost blog as a draft",
+      "Check that the Ghost post matches my source file",
+      "Schedule this post for 07:00 tomorrow"
+    ]
+  }
+}

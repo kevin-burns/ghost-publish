@@ -1,0 +1,14 @@
+{
+  "name": "ghost-publish",
+  "version": "1.0.0",
+  "description": "Publish, update, schedule and verify Ghost posts from a markdown file, driving TryGhost's official ghst CLI. Strips front matter Ghost would render as prose, and diffs what Ghost actually stored against the source in both directions.",
+  "author": {
+    "name": "Kevin Burns",
+    "url": "https://github.com/kevin-burns"
+  },
+  "homepage": "https://github.com/kevin-burns/ghost-publish",
+  "license": "MIT",
+  "skills": [
+    "./ghost-publish"
+  ]
+}
