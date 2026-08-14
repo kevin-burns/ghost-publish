@@ -1,5 +1,7 @@
 # ghost-publish
 
+![ghost-publish banner](images/banner.webp)
+
 Get a markdown file onto a [Ghost](https://ghost.org) blog with the official `ghst` CLI, and
 then **prove** that what arrived is what you sent.
 

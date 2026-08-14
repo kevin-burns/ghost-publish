@@ -1,5 +1,7 @@
 # ghost-publish
 
+![ghost-publish banner](ghost-publish/images/banner.webp)
+
 > **This repository is generated.** `ghost-publish` is developed in
 > [kevin-burns/claude-skills](https://github.com/kevin-burns/claude-skills) and mirrored here on every merge, so that Ghost
 > users can find and install it on its own. **Please raise issues and pull requests
