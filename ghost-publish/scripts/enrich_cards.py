@@ -181,9 +181,8 @@ def build_gallery(images: list[dict], images_dir: Path | None,
         src = node.get("src", "")
         width, height = node.get("width"), node.get("height")
         local = resolve_local(src, images_dir)
-        if (not width or not height) and local is not None:
-            if size := image_size(local):
-                width, height = size
+        if (not width or not height) and local is not None and (size := image_size(local)):
+            width, height = size
         if not width or not height:
             notes.append(
                 f"gallery skipped: no dimensions for {src.rsplit('/', 1)[-1]}"
