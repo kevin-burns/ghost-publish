@@ -297,7 +297,21 @@ ghst post list --filter "status:scheduled" --json --jq '.posts[] | {title, publi
 
 ## Before you publish
 
-Two habits that belong to the post rather than to Ghost, both learned by getting them wrong:
+**Run the preflight check first.** One command, offline, no network:
+
+```bash
+python3 ~/.claude/skills/ghost-publish/scripts/preflight.py
+```
+
+It compares the installed `ghst` against the version the traps below were verified on. `ghst`
+is pre-1.0 and moves fast — 27 tags and 30 commits in the thirty days to 17 August 2026 — and
+the behaviours this skill leans on are undocumented, so no semver promise covers them. **Drift
+warns and names what to re-verify; it does not block.** A check that refuses to run the day
+`ghst` ships a patch is a check that gets commented out, and then the real drift arrives
+unannounced. Use `--strict` in CI, where stopping is the right answer.
+
+Then two habits that belong to the post rather than to Ghost, both learned by getting them
+wrong:
 
 **Re-check anything anchored to a live web page.** Citations of papers stay put; a link count
 on someone's website, a page that has since 404'd, or a vendor's claim about their own product
@@ -319,4 +333,7 @@ verified against **0.16.5** — re-check the traps above after an upgrade, since
 are undocumented behaviours rather than promises.
 
 The scripts under `scripts/` are standard library only and need **Python 3.12+**. They read
-and compare; they never call Ghost and never write to it.
+and compare; they never call Ghost and never write to it. `preflight.py` is the one that shells
+out at all, and only to `ghst --version`, which runs the local binary and touches no network —
+so it can tell you the tool is the one these traps were written against, and cannot tell you
+your credentials work.

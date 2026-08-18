@@ -80,10 +80,23 @@ ghst post list --json --jq '.posts[0].title'    # a title means you're connected
 ```
 
 The scripts are **standard library only**, Python 3.12+, and never call Ghost — they read
-files and compare them.
+files and compare them. The exception is `preflight.py`, which runs `ghst --version` locally
+and still touches no network.
 
 > **`ghst` is beta.** Behaviour here was verified against **0.16.5**. Several of the traps
 > above are undocumented behaviours rather than promises, so re-check them after an upgrade.
+>
+> That pin is enforced rather than merely written down:
+>
+> ```bash
+> python3 scripts/preflight.py            # warns on drift, names what to re-verify
+> python3 scripts/preflight.py --strict   # for CI, where drift should stop the run
+> ```
+>
+> It warns and does not block, because a check that fails the day `ghst` ships a patch is a
+> check that gets deleted. Bump `VERIFIED` in that file only after re-running the four traps
+> against the new release — the changelog will not mention them, since to Ghost they are not
+> features.
 
 ## Usage
 
