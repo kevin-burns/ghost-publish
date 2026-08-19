@@ -36,6 +36,14 @@ FLAG_FOR_KEY = {
     "tags": "--tags",
 }
 
+# `slug` is the exception, and the asymmetry is ghst's rather than a choice
+# here. Measured on 0.16.6: `page create` takes `--slug <slug>` and sets it,
+# while `post create` has no such option at all and rejects it outright with
+# `error: unknown option '--slug'`. `post update --slug` exists but is a
+# LOOKUP -- it selects a post, it does not rename one. So a post's slug is
+# reachable only through `--from-json`, which is what --payload writes.
+SLUG_FLAG_TARGETS = frozenset({"page"})
+
 
 def split_front_matter(text: str) -> tuple[str, str]:
     """Return (front_matter_body, post_body). Front matter is only recognised
@@ -85,15 +93,43 @@ def parse_front_matter(block: str) -> dict:
     return out
 
 
-def ghst_flags(meta: dict) -> list[str]:
-    """Front-matter keys rendered as ghst flags, in a stable order."""
+def ghst_flags(meta: dict, target: str = "post") -> list[str]:
+    """Front-matter keys rendered as ghst flags, in a stable order.
+
+    `target` decides whether slug is among them -- see SLUG_FLAG_TARGETS.
+    Emitting `--slug` for a post would hand the caller a flag the CLI
+    refuses, which is worse than omitting it and saying why.
+    """
     flags: list[str] = []
     for key, flag in FLAG_FOR_KEY.items():
         if key not in meta:
             continue
+        if key == "slug" and target not in SLUG_FLAG_TARGETS:
+            continue
         value = meta[key]
         flags += [flag, ",".join(value) if isinstance(value, list) else value]
     return flags
+
+
+def payload_for(meta: dict) -> dict:
+    """The `--from-json` payload for a post, which is the only route that
+    sets a slug on one.
+
+    Field names here are Ghost's own, not the CLI's flag names: the excerpt
+    is `custom_excerpt`, and tags are objects rather than a comma-separated
+    string. `status` is deliberately absent for the same reason it is not a
+    flag -- publishing is a state transition, not a content field.
+    """
+    payload: dict = {}
+    for key in ("title", "slug"):
+        if key in meta:
+            payload[key] = meta[key]
+    if "excerpt" in meta:
+        payload["custom_excerpt"] = meta["excerpt"]
+    if "tags" in meta:
+        tags = meta["tags"]
+        payload["tags"] = [{"name": t} for t in (tags if isinstance(tags, list) else [tags])]
+    return payload
 
 
 def main() -> int:
@@ -102,12 +138,21 @@ def main() -> int:
     parser.add_argument("--out", help="write the body here (default: stdout)")
     parser.add_argument("--json", action="store_true",
                         help="emit the parsed metadata as JSON instead of flags")
+    parser.add_argument("--target", choices=("post", "page"), default="post",
+                        help="post (default) or page; decides whether slug is a flag")
+    parser.add_argument("--payload",
+                        help="write a --from-json payload here; the only route "
+                             "that sets a slug on a post")
     args = parser.parse_args()
 
     text = Path(args.source).read_text(encoding="utf-8")
     front, body = split_front_matter(text)
     body = body.lstrip("\n")
     meta = parse_front_matter(front) if front else {}
+
+    if args.payload:
+        Path(args.payload).write_text(
+            json.dumps(payload_for(meta), indent=2) + "\n", encoding="utf-8")
 
     if args.out:
         Path(args.out).write_text(body, encoding="utf-8")
@@ -123,9 +168,19 @@ def main() -> int:
           if front else
           f"body -> {args.out}  ({len(body.split())} words, no front matter found)")
 
-    if flags := ghst_flags(meta):
-        print("\nghst flags implied by the front matter:")
+    if flags := ghst_flags(meta, args.target):
+        print(f"\nghst flags implied by the front matter ({args.target}):")
         print("  " + " ".join(shlex.quote(f) for f in flags))
+
+    # A slug on a post is not in those flags and must not be silently dropped.
+    if args.target == "post" and "slug" in meta:
+        if args.payload:
+            print(f"\nslug -> {args.payload}. `post create` has no --slug flag, so pass:"
+                  f"\n  ghst post create --from-json {args.payload} --markdown-file {args.out}")
+        else:
+            print("\nnote: `ghst post create` has no --slug flag, so the front matter's slug"
+                  "\n      is NOT in the flags above. Re-run with --payload PATH and pass it"
+                  "\n      as `ghst post create --from-json PATH`, or the slug is lost.")
 
     # `status` is a Ghost state transition, not a content field -- publishing
     # is a separate, deliberate command and must not be inferred from a file.

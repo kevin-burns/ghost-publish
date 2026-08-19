@@ -12,6 +12,7 @@ import preflight  # noqa: E402
 from prepare_post import (  # noqa: E402
     ghst_flags,
     parse_front_matter,
+    payload_for,
     split_front_matter,
 )
 from verify_post import (  # noqa: E402
@@ -85,6 +86,46 @@ def test_status_is_not_translated_into_a_flag():
     meta = parse_front_matter(split_front_matter(FRONT_MATTER)[0])
     assert meta["status"] == "draft"
     assert "--status" not in ghst_flags(meta)
+
+
+def test_slug_is_not_rendered_as_a_flag_on_a_post():
+    """ghst 0.16.6 `post create` has no --slug option and rejects it with
+    `error: unknown option '--slug'`. Emitting it handed the caller a command
+    that cannot run, and nothing here covered it -- which is the same failure
+    this skill exists to catch, one level up: the tests asserted what was
+    expected and never asked what was absent."""
+    meta = parse_front_matter(split_front_matter(FRONT_MATTER)[0])
+    assert meta["slug"] == "measuring-register"
+    assert "--slug" not in ghst_flags(meta)
+    assert "--slug" not in ghst_flags(meta, "post")
+
+
+def test_slug_is_rendered_as_a_flag_on_a_page():
+    """The asymmetry is ghst's, not ours: `page create --slug <slug>` exists
+    and sets the slug, verified against 0.16.6."""
+    meta = parse_front_matter(split_front_matter(FRONT_MATTER)[0])
+    flags = ghst_flags(meta, "page")
+    assert "--slug" in flags
+    assert flags[flags.index("--slug") + 1] == "measuring-register"
+
+
+def test_payload_carries_the_slug_under_ghosts_own_field_names():
+    """--from-json is the only route that sets a post's slug. It takes Ghost's
+    API field names rather than the CLI's flag names, so `excerpt` becomes
+    `custom_excerpt` and tags become objects."""
+    payload = payload_for(parse_front_matter(split_front_matter(FRONT_MATTER)[0]))
+    assert payload["slug"] == "measuring-register"
+    assert payload["custom_excerpt"] == "A short excerpt."
+    assert payload["tags"] == [{"name": "Writing"}, {"name": "Claude Skills"},
+                               {"name": "Python"}]
+    assert "excerpt" not in payload
+
+
+def test_payload_does_not_carry_status():
+    """Same rule as the flags: publishing is a state transition and must be a
+    deliberate command, never a field smuggled in from a file."""
+    payload = payload_for(parse_front_matter(split_front_matter(FRONT_MATTER)[0]))
+    assert "status" not in payload
 
 
 def test_unsupported_yaml_is_reported_rather_than_guessed_at():
@@ -238,7 +279,7 @@ def test_table_cell_text_is_kept_not_discarded():
 
 # --- preflight: the pin that nothing enforced ----------------------------------------
 #
-# SKILL.md and README.md both say "verified against 0.16.5 -- re-check the traps after an
+# SKILL.md and README.md both say "verified against the pinned release -- re-check the traps after an
 # upgrade". That is a pin written in prose. `ghst` is pre-1.0 with 27 tags and 30 commits in
 # the thirty days to 2026-08-17, and the four behaviours this skill leans on are UNDOCUMENTED,
 # so no semver promise covers them.
@@ -252,15 +293,27 @@ def _proc(out="", code=0):
     return type("P", (), {"stdout": out, "returncode": code, "stderr": ""})()
 
 
+def _rel(patch=0, minor=0, major=0) -> str:
+    """A version string relative to whatever preflight currently pins.
+
+    These tests are about how `report` CLASSIFIES a version, not about any
+    particular release. Hardcoding the pin made every legitimate bump look
+    like three test failures, which trains people to edit the tests rather
+    than re-verify the traps -- exactly backwards.
+    """
+    a, b, c = preflight.parse(preflight.VERIFIED)
+    return f"{a + major}.{b + minor if not major else 0}.{c + patch if not (minor or major) else 0}"
+
+
 def test_the_verified_version_passes():
-    code, lines = preflight.report("0.16.5", None)
+    code, lines = preflight.report(_rel(), None)
     assert code == 0
     assert lines[0].startswith("ok")
 
 
 def test_a_patch_ahead_warns_and_does_not_block():
     """THE DESIGN DECISION. ghst ships patches weekly; blocking here would get this deleted."""
-    code, lines = preflight.report("0.16.6", None)
+    code, lines = preflight.report(_rel(patch=1), None)
     assert code == 0, "a patch bump must not block a publish"
     assert lines[0].startswith("WARN") and "patch ahead" in lines[0]
 
@@ -268,14 +321,14 @@ def test_a_patch_ahead_warns_and_does_not_block():
 def test_a_minor_release_is_called_out_differently_from_a_patch():
     """A minor bump is where an undocumented behaviour plausibly moves. Same exit code, louder
     words -- the reader decides, but they are not told it is routine."""
-    code, lines = preflight.report("0.17.0", None)
+    code, lines = preflight.report(_rel(minor=1), None)
     assert code == 0
     assert "MINOR" in lines[0]
     assert not any("usually harmless" in line for line in lines)
 
 
 def test_a_major_release_says_major():
-    _, lines = preflight.report("1.0.0", None)
+    _, lines = preflight.report(_rel(major=1), None)
     assert "MAJOR" in lines[0]
 
 
@@ -283,14 +336,14 @@ def test_an_older_ghst_is_its_own_case():
     """Older is not the same risk as newer: the traps were written against behaviour this
     build may not have yet. Calling it 'behind' rather than folding it into drift keeps the
     two apart."""
-    _, lines = preflight.report("0.16.4", None)
+    _, lines = preflight.report(_rel(patch=-1), None)
     assert "OLDER" in lines[0]
 
 
 def test_every_drift_warning_names_the_traps_to_recheck():
     """A warning that says 'version changed' and stops is noise. The value is naming the four
     undocumented behaviours, because those are what a release note will never mention."""
-    for version in ("0.16.6", "0.17.0", "1.0.0", "0.16.4"):
+    for version in (_rel(patch=1), _rel(minor=1), _rel(major=1), _rel(patch=-1)):
         _, lines = preflight.report(version, None)
         body = "\n".join(lines)
         for trap in preflight.TRAPS:
@@ -313,7 +366,7 @@ def test_an_unparseable_version_fails_rather_than_passing_quietly():
 
 
 def test_a_nonstandard_verified_argument_is_refused():
-    code, lines = preflight.report("0.16.5", None, verified="latest")
+    code, lines = preflight.report(_rel(), None, verified="latest")
     assert code == 1
     assert "not an x.y.z" in lines[0]
 

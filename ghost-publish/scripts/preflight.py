@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the installed `ghst` against the version this skill's traps were verified on.
 
-WHY THIS EXISTS. SKILL.md and README.md both say "verified against 0.16.5 -- re-check the
+WHY THIS EXISTS. SKILL.md and README.md both say "verified against 0.16.6 -- re-check the
 traps above after an upgrade". That is a pin written in prose, which nothing enforces. The
 same shape cost an afternoon elsewhere on 2026-08-17: a toolchain pinned in a comment and
 resolved from PATH in the code turned out to be forty-two versions stale, and it reported
@@ -45,7 +45,7 @@ import sys
 # THE VERSION THE TRAPS WERE VERIFIED AGAINST. Bump it only after actually re-running the
 # four behaviours above against the new release -- not after reading its changelog. The
 # changelog will not mention them, because to Ghost they are not features.
-VERIFIED = "0.16.5"
+VERIFIED = "0.16.6"
 
 TRAPS = (
     "--markdown-file sending YAML front matter into the post body",

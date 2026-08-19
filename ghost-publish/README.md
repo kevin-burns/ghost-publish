@@ -21,7 +21,9 @@ be. So `verify_post.py` compares the whole document in both directions.
 
 - **Strips front matter before upload.** `--markdown-file` sends bytes verbatim and Ghost has
   no front-matter concept, so a leading `---` block becomes prose. `prepare_post.py` removes
-  it and prints the `ghst` flags it implies (`--title`, `--slug`, `--excerpt`, `--tags`).
+  it and prints the `ghst` flags it implies (`--title`, `--excerpt`, `--tags`). A post's
+  slug has no flag on `post create`, so `--payload` writes the `--from-json` payload that
+  carries it; pages take `--slug` directly via `--target page`.
 - **Verifies both directions.** `verify_post.py` reports sentences in the source but missing
   from Ghost, *and* sentences in Ghost with no source â€” leaked front matter, editor edits, or
   an older draft still in place.
@@ -83,7 +85,7 @@ The scripts are **standard library only**, Python 3.12+, and never call Ghost â€
 files and compare them. The exception is `preflight.py`, which runs `ghst --version` locally
 and still touches no network.
 
-> **`ghst` is beta.** Behaviour here was verified against **0.16.5**. Several of the traps
+> **`ghst` is beta.** Behaviour here was verified against **0.16.6**. Several of the traps
 > above are undocumented behaviours rather than promises, so re-check them after an upgrade.
 >
 > That pin is enforced rather than merely written down:

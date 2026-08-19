@@ -100,13 +100,25 @@ It writes the body without front matter and prints the `ghst` flags the front ma
 Then create or update:
 
 ```bash
-# new post
+# new post -- note there is NO --slug on `post create`
 ghst post create --title "..." --markdown-file /tmp/body.md \
-  --slug my-post --tags "Writing,Python" --json --jq '.posts[0].id'
+  --tags "Writing,Python" --json --jq '.posts[0].id'
 
 # existing post
 ghst post update <post-id> --markdown-file /tmp/body.md --tags "Writing,Python" --json
 ```
+
+**A post's slug is not settable by flag.** `post create` has no `--slug`, and `post update
+--slug` is a *lookup* that selects a post rather than renaming one. The only route is a JSON
+payload, which `prepare_post.py --payload` writes for you:
+
+```bash
+uv run scripts/prepare_post.py post.md --out /tmp/body.md --payload /tmp/post.json
+ghst post create --from-json /tmp/post.json --markdown-file /tmp/body.md --json
+```
+
+Pages are the exception and take the flag directly — `page create --slug my-page` sets it. Pass
+`--target page` to `prepare_post.py` and it renders `--slug` among the flags. Verified on 0.16.6.
 
 `--tags` replaces the tag set rather than adding to it, so pass the full list every time.
 Slug, excerpt and feature image survive an update untouched — but verify rather than trust,
@@ -256,8 +268,14 @@ Three facts about reading a Ghost post back, each of which produces a convincing
 - **`post update --markdown-file` converts to native Lexical.** The document becomes heading
   and paragraph nodes, not a markdown card. A reader that looks only for markdown cards
   reports zero words. The source is **not** recoverable from Ghost after this.
-- **`ghst api /posts/<id>/?formats=html` is rejected** with `VALIDATION_ERROR`. Walk the
-  Lexical tree; the script does this for you.
+- **An inline `?formats=html` query string is refused by the CLI**, not by Ghost: `Endpoint
+  path must not include query parameters. Use --query instead.` The error names the fix, and
+  `ghst api /posts/<id>/ --query formats=html` **does** return rendered HTML — on 0.16.5 and
+  0.16.6 alike. An earlier version of this file called that workaround closed; it was wrong,
+  and wrong when written rather than broken by an upgrade.
+  Prefer the Lexical tree anyway, for a reason that survives: `html` is Ghost's *rendered
+  output*, so diffing against it compares your source with a renderer. `lexical` is the
+  document Ghost stores. The script walks it for you.
 
 Check the metadata separately, since none of it lives in the body:
 
@@ -329,7 +347,7 @@ Wraps [`ghst`](https://github.com/TryGhost/ghst) (TryGhost, MIT), installed sepa
 from your own environment.
 
 **`ghst` is beta** (README title, first released February 2026). Its behaviour has been
-verified against **0.16.5** — re-check the traps above after an upgrade, since several of them
+verified against **0.16.6** — re-check the traps above after an upgrade, since several of them
 are undocumented behaviours rather than promises.
 
 The scripts under `scripts/` are standard library only and need **Python 3.12+**. They read
