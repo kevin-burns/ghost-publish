@@ -124,6 +124,28 @@ Pages are the exception and take the flag directly — `page create --slug my-pa
 Slug, excerpt and feature image survive an update untouched — but verify rather than trust,
 because that is a behaviour, not a guarantee.
 
+### Updating a post that is already live
+
+Measured on 0.16.6, 2026-08-19, against a published post rather than a draft. All four of
+these are behaviours rather than promises, so re-check them after an upgrade:
+
+| what | what happened |
+|---|---|
+| `status` | stayed `published`. The update does not knock a live post back to draft. |
+| `published_at` | **unchanged.** The edit landed in `updated_at` only. |
+| RSS `pubDate` | unchanged, so the post does not jump the feed or re-notify readers. |
+| email | none. Email fires on the publish transition, and an update is not one. |
+| slug, tags, excerpt, feature image | all survived. |
+
+`published_at` holding still is the one worth knowing, because the alternative is loud: a
+post that re-dates on every typo fix climbs back to the top of the feed and reaches everyone
+subscribed to it again.
+
+**There is no staging step.** `post update --markdown-file` rebuilds the whole document, so a
+live post is briefly whatever you just sent while you are still finding out whether it was
+right. Run `verify_post.py` immediately after, not at the end of the session, and keep the
+edit small enough that you would be comfortable with a reader seeing it mid-flight.
+
 **The feature image is a separate upload.** `ghst image upload` returns a URL; setting it on
 the post is its own step. This is also the one capability the MCP server does not have, which
 is why this skill drives the CLI throughout.
