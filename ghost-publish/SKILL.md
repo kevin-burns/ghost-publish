@@ -244,6 +244,26 @@ width, styling and all. Ghost normalises the HTML syntax (`seamless` becomes `se
 and changes nothing else: no width rewriting, no injected centering. This skill does not touch
 it either, and a test pins that.
 
+## Pages
+
+Everything here works on a Ghost **page** as well as a post, because a page holds the same
+Lexical document. Swap the noun in the command and nothing else changes:
+
+```bash
+ghst page create --title "..." --markdown-file /tmp/body.md --slug my-page --tags "..." --json
+ghst page get <page-id> --json --jq '.pages[0].lexical' > /tmp/lexical.json
+ghst page update <page-id> --lexical-file /tmp/enriched.json --json
+```
+
+Note the `.pages[0]` accessor rather than `.posts[0]` — that is the only shape difference, and
+getting it wrong yields `null`, which reads as an empty document rather than as a bad query.
+`prepare_post.py --target page`, `verify_post.py` and `enrich_cards.py` all take the document
+itself and neither know nor care which kind it came from.
+
+**The one real asymmetry is slug, and it favours pages.** `page create --slug` sets the slug.
+`post create` has no such option, so a post's slug has to go through `--from-json` as described
+under [Publishing a file](#publishing-a-file). Verified on 0.16.6.
+
 ## Verify — the step that earns this skill
 
 Run it every time, before publishing and again after. It has caught a stale draft, a

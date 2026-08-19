@@ -27,6 +27,9 @@ be. So `verify_post.py` compares the whole document in both directions.
 - **Verifies both directions.** `verify_post.py` reports sentences in the source but missing
   from Ghost, *and* sentences in Ghost with no source — leaked front matter, editor edits, or
   an older draft still in place.
+- **Works on pages as well as posts.** A Ghost page holds the same Lexical document, so the
+  same read-rewrite-push loop applies with `page` in place of `post` and `.pages[0]` in place
+  of `.posts[0]`. Pages take `--slug` on create; posts do not.
 - **Builds the two cards markdown can't express.** Ghost already makes image, quote, code,
   table and horizontal-rule cards from markdown. It never makes a **gallery** (consecutive
   images stay separate cards; the limit is nine, three to a row) or an **embed** from a bare
