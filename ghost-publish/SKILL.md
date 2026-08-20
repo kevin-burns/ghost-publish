@@ -150,6 +150,33 @@ edit small enough that you would be comfortable with a reader seeing it mid-flig
 the post is its own step. This is also the one capability the MCP server does not have, which
 is why this skill drives the CLI throughout.
 
+**`image upload --json` nests the URL twice, and the obvious path returns `null`.** Measured on
+0.16.6, 2026-08-20. The payload is `{"images":[{"images":[{"url":…,"ref":null}]}]}`, so:
+
+```bash
+ghst image upload hero.webp --json --jq '.images[0].images[0].url'   # the URL
+ghst image upload hero.webp --json --jq '.images[0].url'             # null, silently
+```
+
+`--jq` on a missing key prints `null` and exits 0, so a script that pipes the result straight
+into a post body writes the literal string `null` as an image source and nothing fails until a
+reader sees a broken image. Fetch the URL and check it returns 200 before using it.
+
+**An in-body image must be absolute before it goes to Ghost.** A relative path that works in the
+repo — `![alt](diagram.webp)` — is transmitted verbatim and resolves against the post's own URL,
+which is not where the file is. Upload first, then substitute the returned URL.
+
+**`custom_excerpt` is capped at 300 characters and Ghost rejects the whole post over it.**
+Measured 2026-08-20: a 421-character excerpt returned `422 Validation error, cannot save post`
+with `Validation failed for custom_excerpt` and `maxLength / limit: 300`. Nothing is created.
+The failure names the field, so it is quick to diagnose — but it arrives at create time, after
+the body has been prepared, and it is the one front-matter field with a hard server-side limit.
+Check it before the call:
+
+```bash
+python3 -c "import re,sys;e=re.search(r'^excerpt: \"(.*)\"$',open(sys.argv[1]).read(),re.M);print(len(e.group(1)))" post.md
+```
+
 ## Cards
 
 **Most of them need nothing.** Ghost's markdown conversion already produces native cards, so
