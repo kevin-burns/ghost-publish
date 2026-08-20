@@ -177,6 +177,26 @@ Check it before the call:
 python3 -c "import re,sys;e=re.search(r'^excerpt: \"(.*)\"$',open(sys.argv[1]).read(),re.M);print(len(e.group(1)))" post.md
 ```
 
+**`feature_image_alt` is capped at 191 characters, and it is a different limit from the
+excerpt's 300.** Measured 2026-08-20: a 316-character alt returned `422 Validation error,
+cannot edit post` with `Value in [post_revisions.feature_image_alt] exceeds maximum length of
+191 characters`. Nothing is written. 191 is short for a genuinely descriptive alt, so write to
+the limit deliberately rather than truncating a longer one and losing its subject.
+
+**The feature image needs two calls.** `post update` has `--feature-image` for the URL and no
+flag for the other two fields, so alt and caption go through a JSON patch:
+
+```bash
+ghst post update <id> --feature-image "$URL" --json
+ghst post update <id> --from-json /tmp/image.json --json   # feature_image_alt, feature_image_caption
+```
+
+> **Never send a write to `/dev/null`.** Every cap on this page fails with a 422 that names the
+> field, and every one of them is invisible if the response is discarded. A suppressed
+> `post update` looks exactly like a successful one: no output, exit 0, nothing written. That
+> is how the 191-character cap above went unnoticed through a first attempt. Read the response,
+> or read the field back afterwards.
+
 ## Cards
 
 **Most of them need nothing.** Ghost's markdown conversion already produces native cards, so
