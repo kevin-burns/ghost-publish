@@ -73,6 +73,53 @@ I reached for and it turned out to be unnecessary — and one variant of it, an 
 dynamic residential IP, would have handed that bypass to a stranger the next time the address
 was reassigned.
 
+## Install
+
+Three ways in, depending on what you want.
+
+**As a standalone plugin** — this repo on its own:
+
+```bash
+claude plugin marketplace add kevin-burns/ghost-publish
+claude plugin install ghost-publish@ghost-publish
+```
+
+**As part of the collection** — all the skills, one plugin:
+
+```bash
+claude plugin marketplace add kevin-burns/claude-skills
+claude plugin install claude-skills@kevin-burns
+```
+
+**By hand**, if you would rather not use a marketplace: copy the `ghost-publish/` directory
+into `~/.claude/skills/`. Everything the skill needs is inside it.
+
+### Check it actually loaded
+
+Do not take the install command's word for it. This repo has shipped three plugin manifests
+that failed **silently** — one registered cleanly and listed zero plugins, another accepted
+valid paths and loaded zero agents. Verify:
+
+```bash
+claude plugin details ghost-publish@ghost-publish
+```
+
+You want `Skills (1)  ghost-publish` under **Component inventory**. Zero means the manifest
+registered and the skill did not load.
+
+**A trap worth knowing:** `claude --safe-mode` disables plugin-provided skills, so a skill
+installed this way will not appear in a safe-mode session. That is not a broken install.
+
+Once loaded, the skill is namespaced as `ghost-publish:ghost-publish` — a copy placed directly in
+`~/.claude/skills/` appears unnamespaced instead, and the two can coexist.
+
+To remove it:
+
+```bash
+claude plugin uninstall ghost-publish@ghost-publish
+claude plugin marketplace remove ghost-publish
+```
+
 ## Requirements
 
 `ghst` installed separately and already authenticating:
