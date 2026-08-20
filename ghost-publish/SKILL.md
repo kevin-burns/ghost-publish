@@ -333,6 +333,68 @@ itself and neither know nor care which kind it came from.
 `post create` has no such option, so a post's slug has to go through `--from-json` as described
 under [Publishing a file](#publishing-a-file). Verified on 0.16.6.
 
+## Social and SEO fields, and the three names each one has
+
+Ghost calls these something different in the API, in the admin UI, and in the rendered page,
+which makes them hard to talk about and easy to set twice. Mapped 2026-08-20 against the
+[Ghost SEO](https://ghost.org/help/seo/) and [site setup](https://ghost.org/help/site-setup/)
+docs, plus the rendered HTML of a live post.
+
+| API field | Ghost UI | rendered as | `ghst` |
+|---|---|---|---|
+| `feature_image` | Post settings → feature image | `og:image`, `twitter:image` | `--feature-image` |
+| `custom_excerpt` | Post settings → Excerpt | `description`, `og:description`, `twitter:description` | `--excerpt` |
+| `meta_title` / `meta_description` | **Meta data** | `<title>`, `description` | `--meta-title` / `--meta-description` |
+| `og_title` / `og_image` | **Facebook card** | `og:title` / `og:image` | `--og-title` / `--og-image` |
+| `og_description` | **Facebook card** | `og:description` | **no flag — `--from-json`** |
+| `twitter_title` / `twitter_description` / `twitter_image` | **X card** (was Twitter card) | `twitter:*` | **no flag — `--from-json`** |
+
+**"og" appears nowhere in the UI.** Anyone verifying your `--og-image` in Ghost is looking for
+a Facebook card, and anyone looking for a Twitter card now finds one labelled **X card**.
+
+**Most of the time you should set none of them.** Measured on a live post that sets only a
+title, an excerpt and a feature image, Ghost emitted a complete set on its own: `og:title` and
+`twitter:title` from the post title, `description` and both social descriptions from the
+custom excerpt, `og:image` and `twitter:image` from the feature image, plus `canonical`,
+`og:type`, `og:site_name`, `twitter:card=summary_large_image` and one `application/ld+json`
+block. Set a social field only when you want the card to differ from the page.
+
+**Which makes the excerpt cap sharper than it first looks.** `custom_excerpt` is not merely a
+card subtitle — it is the meta description and both social descriptions as well. One 300-
+character field is doing four jobs, and the 422 above is the only thing that tells you when it
+cannot.
+
+**Ghost serves the card image at `/size/w1200/`**, derived from whatever you uploaded, so a
+2000–2752px original is right and no hand-resizing for social is needed.
+
+**Setting `og_image` does NOT settle `twitter_image`, and the fallback is not the one you would
+guess.** Measured 2026-08-20 on a post carrying a feature image and an `og_image`, with
+`twitter_image` left null:
+
+```
+og:image       →  the og_image
+twitter:image  →  the FEATURE IMAGE, not the og_image
+```
+
+X has its own card and its own lineage. It does not inherit the Facebook card's image; it falls
+back past it to the feature image. So a post that sets `og_image` alone ships **two different
+pictures** — the Open Graph one on Facebook and LinkedIn, the feature image on X — and nothing
+warns you, because both fields are populated and both render.
+
+A second probe with a **different image in all three slots** completes the rule:
+
+| `feature_image` | `og_image` | `twitter_image` | → `og:image` | → `twitter:image` |
+|---|---|---|---|---|
+| set | unset | unset | feature | feature |
+| set | set | unset | og | **feature** |
+| set | set | set | og | twitter |
+
+So each card reads its own field first and falls back to `feature_image` — never to the other
+card. The feature image is not used by either card once both are set explicitly.
+
+If the social card should be the same everywhere, set `og_image` **and** `twitter_image`.
+Everything except `og_image` needs `--from-json`; only that one has a flag.
+
 ## Verify — the step that earns this skill
 
 Run it every time, before publishing and again after. It has caught a stale draft, a
