@@ -28,12 +28,19 @@ that apart from a skill problem.
 
 ## Connection
 
-> **If your blog sits behind an identity provider — Cloudflare Access, Tailscale, Authelia,
+> **If your blog sits behind an access gateway — Cloudflare Access, Tailscale, Authelia,
 > an SSO proxy — `ghst` cannot get past it, and neither can this skill.** That is not a defect
-> in either. The IdP is doing exactly its job: refusing an unauthenticated request. Resolving
-> it is the operator's side of the line, and this section says how. Do not report it as a skill
-> bug, and do not work around it by weakening the IdP until you have tried the routes below —
-> the usual answer costs one header and changes no security posture at all.
+> in either. The gateway is doing exactly its job: refusing an unauthenticated request.
+> Resolving it is the operator's side of the line, and this section says how. Do not report it
+> as a skill bug, and do not work around it by weakening the gateway until you have tried the
+> routes below — the usual answer costs one header and changes no security posture at all.
+>
+> **Gateway, not identity provider, and the distinction is load-bearing here.** Cloudflare
+> Access federates out to an identity provider — Google, GitHub, a one-time PIN — and is not
+> one itself. This section is entirely about WHICH COMPONENT is refusing the request, because
+> the gateway and Ghost refuse for different reasons and only one of them is yours to fix. An
+> earlier version of this section called the gateway an IdP throughout, which muddied the one
+> thing it exists to teach.
 
 **Assume nothing about auth. Test it first, in one call:**
 
@@ -47,10 +54,10 @@ setup problem the user has to resolve before this skill can do anything.
 Two things make that test fail in ways worth naming, because both look like CLI bugs:
 
 **`ghst auth login` fails behind an authenticating proxy.** Cloudflare Access, any Zero Trust
-IdP, or an SSO proxy answers the discovery request with a redirect to its login host. `ghst`
-reads that as the site's real origin and aborts with `USAGE_ERROR: Ghost Admin discovery
-resolved to '<idp-host>' instead of '<your-host>'`. **Do not follow its advice to re-run with
-the IdP's URL** — that points the CLI at a login page, not a Ghost site. Skip `auth login`
+gateway, or an SSO proxy answers the discovery request with a redirect to its login host.
+`ghst` reads that as the site's real origin and aborts with `USAGE_ERROR: Ghost Admin discovery
+resolved to '<gateway-host>' instead of '<your-host>'`. **Do not follow its advice to re-run
+with the gateway's URL** — that points the CLI at a login page, not a Ghost site. Skip `auth login`
 entirely and use environment variables, which sit third in `ghst`'s connection-resolution
 order, ahead of the config files that `auth login` would have written:
 
@@ -83,7 +90,7 @@ curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://your-blog/gh
 curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Forwarded-Proto: https' http://internal-host:2368/ghost/api/admin/site/
 ```
 
-A 302 to an IdP is the first problem. A 301 to your own public URL that becomes 200 with the
+A 302 to the gateway's login host is the first problem. A 301 to your own public URL that becomes 200 with the
 header is the second.
 
 ## Publishing a file
