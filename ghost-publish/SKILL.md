@@ -104,6 +104,19 @@ uv run ~/.claude/skills/ghost-publish/scripts/prepare_post.py post.md --out /tmp
 ```
 
 It writes the body without front matter and prints the `ghst` flags the front matter implies.
+
+**It also removes the drafting scaffolding under the front matter**, which is a separate
+failure and cost a public post to find. A leading `# H1` duplicates the title Ghost renders
+from its own field, and an author note — an italic line saying who the post is for — is an
+internal aside. Neither is front matter, so an earlier version of this script left both on a
+published post while reporting success. Removed now: one leading H1, one author-note line
+(italic-only, containing `Audience:` or starting `Draft`), and a horizontal rule under either.
+
+Only at the very top, and **every removal is printed to stderr** — a silent strip is how you
+lose an H1 somebody meant to keep. An italic first line that does not match the author-note
+shape is reported and **kept**, because eating a legitimate epigraph is the worse error.
+`--keep-scaffolding` turns the step off when the H1 really is part of the post.
+
 Then create or update:
 
 ```bash

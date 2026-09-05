@@ -149,7 +149,36 @@ def front_matter_leak(ghost_text: str) -> list[str]:
     return [m for m in FRONT_MATTER_MARKERS if m in head]
 
 
-def compare(source_md: str, ghost_text: str) -> dict:
+# The front-matter check above asks "did YAML arrive". It is blind to the other
+# thing that arrives and should not: the drafting scaffolding. On 2026-09-02 a
+# duplicated title and an internal author note went up on a public post, and
+# this file reported them only as sentence-splitter noise -- the same sentences
+# appeared in both difference lists, which is the ordinary signature of a rule
+# splitting a sentence. All the content HAD arrived. Three extra things came
+# with it, and "did my content arrive" cannot see that.
+#
+# So this asks a different question, in the two places the answer lives: the
+# flattened text, for an author note, and the Lexical tree, for a heading that
+# duplicates the title Ghost renders from its own field.
+
+AUTHOR_NOTE_MARKERS = ("audience:", "for techblog", "draft 1 —", "draft 2 —")
+
+
+def scaffolding_leak(ghost_text: str, doc=None) -> list[str]:
+    """Drafting scaffolding that reached the post. Empty list is the pass."""
+    found = [f"author note ({m.strip()})"
+             for m in AUTHOR_NOTE_MARKERS if m in ghost_text[:600].lower()]
+    # A published post should carry no h1 at all: Ghost renders the title from
+    # its own field, so one in the body is the draft's title, printed twice.
+    children = (doc or {}).get("root", {}).get("children", [])
+    for node in children[:3]:
+        if isinstance(node, dict) and str(node.get("tag", "")).lower() == "h1":
+            found.append("a leading h1 node, which duplicates Ghost's own title")
+            break
+    return found
+
+
+def compare(source_md: str, ghost_text: str, doc=None) -> dict:
     src = Counter(key(s) for s in sentences(markdown_to_text(source_md)))
     dst = Counter(key(s) for s in sentences(ghost_text))
     lookup = {key(s): s for s in sentences(ghost_text)}
@@ -162,6 +191,7 @@ def compare(source_md: str, ghost_text: str) -> dict:
         "source_words": len(markdown_to_text(source_md).split()),
         "ghost_words": len(ghost_text.split()),
         "leak": front_matter_leak(ghost_text),
+        "scaffolding": scaffolding_leak(ghost_text, doc),
     }
 
 
@@ -173,6 +203,13 @@ def report(result: dict, limit: int) -> str:
                   "Ghost renders a leading --- block as prose. Strip it with",
                   "prepare_post.py and re-upload; do not fix it in the Ghost editor,",
                   "or the source file and the post will diverge.",
+                  "!" * 70, ""]
+
+    if result.get("scaffolding"):
+        lines += ["!" * 70,
+                  "DRAFTING SCAFFOLDING IN THE POST: " + "; ".join(result["scaffolding"]),
+                  "This is written for you, not the reader. Re-run prepare_post.py",
+                  "(which removes it and says what it removed) and re-upload.",
                   "!" * 70, ""]
 
     lines.append(f"source {result['source_words']} words  |  "
@@ -192,7 +229,8 @@ def report(result: dict, limit: int) -> str:
         if len(items) > limit:
             lines.append(f"   ... and {len(items) - limit} more (raise --limit)")
 
-    if not result["missing"] and not result["extra"] and not result["leak"]:
+    if not result["missing"] and not result["extra"] and not result["leak"] \
+            and not result.get("scaffolding"):
         lines.append("\nNo differences. Every sentence in the source is in Ghost and "
                      "vice versa.\nMetadata is NOT checked here -- verify status, slug, "
                      "tags, excerpt and\nfeature image separately with `ghst post get`.")
@@ -208,8 +246,9 @@ def main() -> int:
     args = parser.parse_args()
 
     source = Path(args.source).read_text(encoding="utf-8")
-    ghost = lexical_text(load_lexical(Path(args.lexical)))
-    result = compare(source, ghost)
+    doc = load_lexical(Path(args.lexical))
+    ghost = lexical_text(doc)
+    result = compare(source, ghost, doc)
 
     if args.json:
         print(json.dumps(result, indent=2))

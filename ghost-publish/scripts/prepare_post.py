@@ -2,6 +2,12 @@
 """Split a markdown post into the body Ghost should receive and the metadata
 it should receive separately.
 
+It also removes the drafting scaffolding directly beneath the front matter --
+a leading H1 that would duplicate Ghost's own title field, and an author note
+saying who the post is for. Neither is front matter, which is exactly why an
+earlier version of this script left both on a public post. Every removal is
+printed to stderr; `--keep-scaffolding` turns the step off.
+
 `ghst post create --markdown-file` transmits the file verbatim. Ghost has no
 concept of front matter -- unlike Hugo or Jekyll, where the `---` block is
 metadata, Ghost treats it as prose and renders it above the first paragraph
@@ -53,6 +59,75 @@ def split_front_matter(text: str) -> tuple[str, str]:
     if not match:
         return "", text
     return match.group(1), text[match.end():]
+
+
+# --- drafting scaffolding -------------------------------------------------
+#
+# What sits between the front matter and the first real paragraph in a draft,
+# written for the author rather than the reader. It is NOT front matter, which
+# is why removing the front matter and stopping was not enough: on 2026-09-02 a
+# leading H1 and an author note went up on a public post. Ghost renders the
+# title from its own field, so the H1 duplicated it, and the note said who the
+# post was for -- an internal aside, published.
+#
+# Both rules are deliberately narrow:
+#   * only at the very top, before any prose. Scaffolding further down is prose.
+#   * every removal is PRINTED, to stderr so it survives the stdout path too.
+#     A silent strip is how you lose an H1 somebody meant to keep.
+#
+# An emphasis-only line that does NOT match the author-note shape is reported
+# and LEFT ALONE. Stripping on suspicion would eat a legitimate epigraph, and a
+# warning costs the author one glance.
+
+H1_RE = re.compile(r"\A#[ \t]+\S")
+HR_RE = re.compile(r"\A(?:-{3,}|\*{3,}|_{3,})\Z")
+# The whole line is one emphasis span -- no delimiter inside, so "*a* and *b*"
+# does not qualify. A heading wrapper is allowed because drafts have used one.
+EMPHASIS_ONLY_RE = re.compile(r"\A(?:#{1,6}[ \t]+)?(?:\*([^*]+)\*|_([^_]+)_)\Z")
+# Two unambiguous author-note markers, measured against every post in the
+# corpus that carried one. A bare "For <something>" is NOT enough: an article
+# may legitimately open on an italic line beginning "For years...".
+AUTHOR_NOTE_RE = re.compile(r"audience:|\Adraft\b", re.I)
+
+
+def strip_scaffolding(body: str) -> tuple[str, list[str], list[str]]:
+    """Remove leading drafting scaffolding. Returns (body, removed, warnings).
+
+    Order, each part optional and only at the very top: one H1, one author-note
+    line, and a horizontal rule following either. The rule is removed only if
+    something above it was, so a post that legitimately opens on one keeps it.
+    """
+    lines = body.split("\n")
+    removed: list[str] = []
+    warnings: list[str] = []
+
+    def peek() -> tuple[int, str] | None:
+        for i, line in enumerate(lines):
+            if line.strip():
+                return i, line.strip()
+        return None
+
+    def drop(index: int, label: str) -> None:
+        text = lines[index].strip()
+        removed.append(f"{label}: {text[:90]}{'...' if len(text) > 90 else ''}")
+        del lines[:index + 1]
+
+    if (found := peek()) and H1_RE.match(found[1]):
+        drop(found[0], "leading H1 (Ghost renders the title from its own field)")
+
+    if (found := peek()) and (match := EMPHASIS_ONLY_RE.match(found[1])):
+        inner = match.group(1) or match.group(2) or ""
+        if AUTHOR_NOTE_RE.search(inner):
+            drop(found[0], "author note")
+        else:
+            warnings.append(
+                "first line is entirely italic and may be an author note, but does not "
+                f"match the known shape, so it was KEPT: {found[1][:90]}")
+
+    if removed and (found := peek()) and HR_RE.match(found[1]):
+        drop(found[0], "horizontal rule under the scaffolding")
+
+    return "\n".join(lines).lstrip("\n"), removed, warnings
 
 
 def _unquote(value: str) -> str:
@@ -143,12 +218,27 @@ def main() -> int:
     parser.add_argument("--payload",
                         help="write a --from-json payload here; the only route "
                              "that sets a slug on a post")
+    parser.add_argument("--keep-scaffolding", action="store_true",
+                        help="keep a leading H1 and author note instead of removing "
+                             "them; use when the H1 is genuinely part of the post")
     args = parser.parse_args()
 
     text = Path(args.source).read_text(encoding="utf-8")
     front, body = split_front_matter(text)
     body = body.lstrip("\n")
     meta = parse_front_matter(front) if front else {}
+
+    # Reported on stderr rather than stdout: without --out the body IS stdout,
+    # and a note printed into it would be published along with the post.
+    removed: list[str] = []
+    if args.keep_scaffolding:
+        warnings: list[str] = []
+    else:
+        body, removed, warnings = strip_scaffolding(body)
+    for line in removed:
+        print(f"removed {line}", file=sys.stderr)
+    for line in warnings:
+        print(f"warning: {line}", file=sys.stderr)
 
     if args.payload:
         Path(args.payload).write_text(

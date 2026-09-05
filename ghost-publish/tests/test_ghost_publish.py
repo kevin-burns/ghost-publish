@@ -14,6 +14,7 @@ from prepare_post import (  # noqa: E402
     parse_front_matter,
     payload_for,
     split_front_matter,
+    strip_scaffolding,
 )
 from verify_post import (  # noqa: E402
     compare,
@@ -21,6 +22,7 @@ from verify_post import (  # noqa: E402
     lexical_text,
     load_lexical,
     markdown_to_text,
+    scaffolding_leak,
 )
 
 FRONT_MATTER = """---
@@ -397,3 +399,153 @@ def test_the_verified_constant_matches_what_the_docs_claim():
     for name in ("SKILL.md", "README.md"):
         text = (root / name).read_text()
         assert preflight.VERIFIED in text, f"{name} does not mention {preflight.VERIFIED}"
+
+
+# ---------------------------------------------------------------------------
+# prepare_post: drafting scaffolding. On 2026-09-02 a leading H1 and an author
+# note reached a PUBLIC post, because removing the front matter and stopping
+# left them in place. Both directions are asserted here -- a clean post must
+# come through untouched, or the fix is worse than the bug it replaces.
+# ---------------------------------------------------------------------------
+
+SCAFFOLDED = """# Four Millimetres From Unsearchable: CI Gates for a CV
+
+*For techblog.kevinburns.de. Audience: Claude Code / agent builders.*
+
+---
+
+A colleague rebuilt his CV as code.
+"""
+
+
+def test_the_three_pieces_of_scaffolding_are_all_removed():
+    body, removed, _ = strip_scaffolding(SCAFFOLDED)
+
+    assert body.startswith("A colleague rebuilt his CV as code.")
+    assert len(removed) == 3
+
+
+def test_every_removal_is_reported_rather_than_silent():
+    # The whole reason a silent strip is unacceptable: an H1 somebody meant to
+    # keep would vanish with nothing to notice.
+    _, removed, _ = strip_scaffolding(SCAFFOLDED)
+
+    assert any("H1" in line for line in removed)
+    assert any("author note" in line for line in removed)
+    assert any("horizontal rule" in line for line in removed)
+
+
+def test_a_post_that_opens_on_prose_is_untouched():
+    # The regression that matters. Three published posts open straight into
+    # prose and must come through byte-identical.
+    clean = "My most recent post used no contractions. Not one.\n\n# A real heading\n"
+
+    body, removed, warnings = strip_scaffolding(clean)
+
+    assert body == clean
+    assert removed == []
+    assert warnings == []
+
+
+def test_a_draft_marker_author_note_is_recognised():
+    text = "# Title\n\n*Draft 2 — for the blog. Post 2 of a series.*\n\nReal prose.\n"
+
+    body, removed, _ = strip_scaffolding(text)
+
+    assert body.startswith("Real prose.")
+    assert len(removed) == 2
+
+
+def test_an_italic_epigraph_is_kept_and_warned_about_rather_than_stripped():
+    # Stripping on suspicion would eat a legitimate opening line. A warning
+    # costs the author one glance; a wrong strip is invisible.
+    text = "*For years I believed the tests were the hard part.*\n\nThey were not.\n"
+
+    body, removed, warnings = strip_scaffolding(text)
+
+    assert body == text
+    assert removed == []
+    assert len(warnings) == 1
+
+
+def test_a_line_with_two_emphasis_spans_is_not_treated_as_an_author_note():
+    text = "Some *emphasis* and more *emphasis* about the audience: here.\n"
+
+    body, removed, warnings = strip_scaffolding(text)
+
+    assert body == text
+    assert (removed, warnings) == ([], [])
+
+
+def test_a_horizontal_rule_is_kept_when_nothing_above_it_was_removed():
+    # A post may legitimately open on a rule. It is only scaffolding when it
+    # was sitting under scaffolding.
+    text = "---\n\nProse follows.\n"
+
+    body, removed, _ = strip_scaffolding(text)
+
+    assert body == text
+    assert removed == []
+
+
+def test_scaffolding_further_down_the_document_survives():
+    # Only the very top is scaffolding. An H1 in the body is the author's.
+    text = "Opening prose.\n\n# A heading they wrote\n\n*Audience: nobody*\n"
+
+    body, removed, _ = strip_scaffolding(text)
+
+    assert body == text
+    assert removed == []
+
+
+def test_an_author_note_wrapped_in_a_heading_is_still_an_author_note():
+    text = "# Title\n\n## *For the blog. Audience: agent builders.*\n\nProse.\n"
+
+    body, removed, _ = strip_scaffolding(text)
+
+    assert body.startswith("Prose.")
+    assert len(removed) == 2
+
+
+# ---------------------------------------------------------------------------
+# verify_post: the scaffolding was invisible to "did my content arrive" -- all
+# of it had. These ask the other question, in the two places the answer lives.
+# ---------------------------------------------------------------------------
+
+def test_an_author_note_in_the_published_text_is_reported():
+    ghost = "For techblog.kevinburns.de. Audience: agent builders. A colleague rebuilt his CV."
+
+    assert scaffolding_leak(ghost)
+
+
+def test_a_leading_h1_node_is_reported_even_when_the_text_looks_clean():
+    # The case sentence comparison cannot see: the words are legitimately in
+    # the source too, so only the node type gives it away.
+    doc = {"root": {"children": [{"type": "extended-heading", "tag": "h1"},
+                                 {"type": "paragraph"}]}}
+
+    found = scaffolding_leak("A colleague rebuilt his CV as code.", doc)
+
+    assert any("h1" in f for f in found)
+
+
+def test_a_clean_post_reports_no_scaffolding():
+    doc = {"root": {"children": [{"type": "paragraph"}, {"type": "paragraph"}]}}
+
+    assert scaffolding_leak("My most recent post used no contractions.", doc) == []
+
+
+def test_an_h2_is_not_mistaken_for_a_duplicated_title():
+    # Body headings are ordinary. Only h1 duplicates Ghost's own title field.
+    doc = {"root": {"children": [{"type": "extended-heading", "tag": "h2"}]}}
+
+    assert scaffolding_leak("Prose.", doc) == []
+
+
+def test_compare_surfaces_scaffolding_alongside_the_sentence_diff():
+    doc = {"root": {"children": [{"type": "extended-heading", "tag": "h1"}]}}
+
+    result = compare("Prose.", "Prose.", doc)
+
+    assert result["missing"] == [] and result["extra"] == []
+    assert result["scaffolding"], "identical content must not mask scaffolding"

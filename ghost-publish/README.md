@@ -24,9 +24,17 @@ be. So `verify_post.py` compares the whole document in both directions.
   it and prints the `ghst` flags it implies (`--title`, `--excerpt`, `--tags`). A post's
   slug has no flag on `post create`, so `--payload` writes the `--from-json` payload that
   carries it; pages take `--slug` directly via `--target page`.
+- **Strips the drafting scaffolding too**, which is not front matter and was the reason a
+  duplicated title and an internal author note reached a public post. One leading H1, one
+  author-note line, and a rule under either — only at the very top, every removal printed to
+  stderr, and an italic line that does not match the known shape is kept and flagged rather
+  than guessed at. `--keep-scaffolding` opts out.
 - **Verifies both directions.** `verify_post.py` reports sentences in the source but missing
   from Ghost, *and* sentences in Ghost with no source — leaked front matter, editor edits, or
-  an older draft still in place.
+  an older draft still in place. It also asks a question the sentence diff cannot: it looks for
+  an author note in the published text and an `h1` node among the first few, because scaffolding
+  is content that *arrived* rather than content that went missing, and "did my post arrive" is
+  blind to it.
 - **Works on pages as well as posts.** A Ghost page holds the same Lexical document, so the
   same read-rewrite-push loop applies with `page` in place of `post` and `.pages[0]` in place
   of `.posts[0]`. Pages take `--slug` on create; posts do not.
