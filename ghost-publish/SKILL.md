@@ -1,6 +1,7 @@
 ---
 name: ghost-publish
-description: Publish, update, schedule and verify posts on a Ghost blog from a markdown file, driving the official `ghst` CLI. Use when the user wants to push a draft to Ghost, update an existing post, schedule a post for a future date, set tags/slug/excerpt/feature image, or check that what Ghost actually holds matches the source file. Also use when a Ghost upload has gone wrong — front matter showing in the post body, a stale draft, missing tags, a post that reads differently on the site than in the file. Covers the traps that bite every first run: `--markdown-file` sends YAML front matter as visible text, `post update` converts markdown to Lexical so the source is not recoverable, `post get` returns no `html` field, and `auth login` fails behind any authenticating proxy. Not for writing or editing the prose itself — use clear-and-human for that.
+description: >-
+  Publish, update, schedule and verify Ghost blog posts from a markdown file with the official `ghst` CLI: push a draft, update a post, schedule it, set tags, slug, excerpt or feature image, and check that what Ghost holds matches the source. Also for a Ghost upload gone wrong: front matter showing in the post, a stale draft, missing tags, a post that reads differently on the site. Not for writing the prose (clear-and-human).
 license: MIT
 ---
 
