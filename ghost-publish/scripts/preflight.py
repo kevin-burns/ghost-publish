@@ -45,7 +45,7 @@ import sys
 # THE VERSION THE TRAPS WERE VERIFIED AGAINST. Bump it only after actually re-running the
 # four behaviours above against the new release -- not after reading its changelog. The
 # changelog will not mention them, because to Ghost they are not features.
-VERIFIED = "0.16.6"
+VERIFIED = "0.18.2"
 
 TRAPS = (
     "--markdown-file sending YAML front matter into the post body",

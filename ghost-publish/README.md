@@ -143,7 +143,7 @@ The scripts are **standard library only**, Python 3.12+, and never call Ghost â€
 files and compare them. The exception is `preflight.py`, which runs `ghst --version` locally
 and still touches no network.
 
-> **`ghst` is beta.** Behaviour here was verified against **0.16.6**. Several of the traps
+> **`ghst` is beta.** Behaviour here was verified against **0.18.2**. Several of the traps
 > above are undocumented behaviours rather than promises, so re-check them after an upgrade.
 >
 > That pin is enforced rather than merely written down:

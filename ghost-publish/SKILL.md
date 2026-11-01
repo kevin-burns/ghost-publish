@@ -139,7 +139,7 @@ ghst post create --from-json /tmp/post.json --markdown-file /tmp/body.md --json
 ```
 
 Pages are the exception and take the flag directly — `page create --slug my-page` sets it. Pass
-`--target page` to `prepare_post.py` and it renders `--slug` among the flags. Verified on 0.16.6.
+`--target page` to `prepare_post.py` and it renders `--slug` among the flags. Verified on 0.18.2.
 
 `--tags` replaces the tag set rather than adding to it, so pass the full list every time.
 Slug, excerpt and feature image survive an update untouched — but verify rather than trust,
@@ -147,8 +147,9 @@ because that is a behaviour, not a guarantee.
 
 ### Updating a post that is already live
 
-Measured on 0.16.6, 2026-08-19, against a published post rather than a draft. All four of
-these are behaviours rather than promises, so re-check them after an upgrade:
+Measured on 0.16.6, 2026-08-19, against a published post rather than a draft, and **not
+re-measured on 0.18.2**, which was tested on a draft only. All of these are behaviours rather
+than promises, so re-check them after an upgrade:
 
 | what | what happened |
 |---|---|
@@ -168,8 +169,9 @@ right. Run `verify_post.py` immediately after, not at the end of the session, an
 edit small enough that you would be comfortable with a reader seeing it mid-flight.
 
 **The feature image is a separate upload.** `ghst image upload` returns a URL; setting it on
-the post is its own step. This is also the one capability the MCP server does not have, which
-is why this skill drives the CLI throughout.
+the post is its own step. As of ghst 0.18.2 the MCP server has `ghost_image_upload` and feature
+image fields on post create and update, so this is no longer a gap between the two; this skill
+drives the CLI throughout because its checks are written against the CLI's output.
 
 **`image upload --json` nests the URL twice, and the obvious path returns `null`.** Measured on
 0.16.6, 2026-08-20. The payload is `{"images":[{"images":[{"url":…,"ref":null}]}]}`, so:
@@ -240,7 +242,7 @@ itself and neither know nor care which kind it came from.
 
 **The one real asymmetry is slug, and it favours pages.** `page create --slug` sets the slug.
 `post create` has no such option, so a post's slug has to go through `--from-json` as described
-under [Publishing a file](#publishing-a-file). Verified on 0.16.6.
+under [Publishing a file](#publishing-a-file). Verified on 0.18.2.
 
 ## Social and SEO fields, and the three names each one has
 
@@ -407,7 +409,7 @@ Wraps [`ghst`](https://github.com/TryGhost/ghst) (TryGhost, MIT), installed sepa
 from your own environment.
 
 **`ghst` is beta** (README title, first released February 2026). Its behaviour has been
-verified against **0.16.6** — re-check the traps above after an upgrade, since several of them
+verified against **0.18.2** — re-check the traps above after an upgrade, since several of them
 are undocumented behaviours rather than promises.
 
 The scripts under `scripts/` are standard library only and need **Python 3.12+**. They read
