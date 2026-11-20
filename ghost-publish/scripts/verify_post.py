@@ -16,8 +16,9 @@ from Ghost (dropped content) *and* sentences in Ghost with no source
 Reading a Ghost post back has three traps, each of which produces a
 convincing false negative, and all three are handled here:
 
-  - `post get` returns no `html` field at all, only `lexical` and
-    `mobiledoc`. Asking for `.posts[0].html` yields `null`.
+  - `post get` returns no `html` field by default, only `lexical` and
+    `mobiledoc`. Asking for `.posts[0].html` yields `null` unless the call
+    passes `--formats html`.
   - `post update --markdown-file` converts markdown into native Lexical
     nodes, so a reader that looks only for markdown cards finds zero words.
     Both shapes are walked below.
@@ -75,7 +76,7 @@ def load_lexical(path: Path):
         raise SystemExit(
             "lexical file is empty or null.\n"
             "`post get --jq '.posts[0].html'` returns null -- Ghost exposes no html\n"
-            "field. Capture '.posts[0].lexical' instead."
+            "field by default (`--formats html` adds it). Capture '.posts[0].lexical' instead."
         )
     doc = json.loads(raw)
     return json.loads(doc) if isinstance(doc, str) else doc

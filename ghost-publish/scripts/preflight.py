@@ -50,7 +50,7 @@ VERIFIED = "0.19.1"
 TRAPS = (
     "--markdown-file sending YAML front matter into the post body",
     "post update converting markdown to Lexical (source not recoverable)",
-    "post get returning no html field",
+    "post get returning no html field unless --formats html",
     "auth login behind an authenticating proxy",
 )
 

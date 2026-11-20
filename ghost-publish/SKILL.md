@@ -174,7 +174,8 @@ image fields on post create and update, so this is no longer a gap between the t
 drives the CLI throughout because its checks are written against the CLI's output.
 
 **`image upload --json` nests the URL twice, and the obvious path returns `null`.** Measured on
-0.16.6, 2026-08-20. The payload is `{"images":[{"images":[{"url":…,"ref":null}]}]}`, so:
+0.16.6, 2026-08-20, and unchanged on 0.19.1 (2026-11-20, where `post update --feature-image`
+with the returned URL set it on a draft). The payload is `{"images":[{"images":[{"url":…,"ref":null}]}]}`, so:
 
 ```bash
 ghst image upload hero.webp --json --jq '.images[0].images[0].url'   # the URL
@@ -324,9 +325,10 @@ sentences in the source but not in Ghost **and** sentences in Ghost but not in t
 
 Three facts about reading a Ghost post back, each of which produces a convincing false alarm:
 
-- **`post get` has no `html` field.** It returns `lexical` and `mobiledoc` only. Asking for
-  `.posts[0].html` yields `null`, and a naive checker reads five bytes of nothing as total
-  content loss.
+- **`post get` has no `html` field by default.** It returns `lexical` and `mobiledoc` only.
+  Asking for `.posts[0].html` yields `null`, and a naive checker reads five bytes of nothing as
+  total content loss. `ghst post get <id> --formats html` adds it: the option was already in
+  0.16.6, verified on 0.19.1 (2026-11-20), and this file missed it until then.
 - **`post update --markdown-file` converts to native Lexical.** The document becomes heading
   and paragraph nodes, not a markdown card. A reader that looks only for markdown cards
   reports zero words. The source is **not** recoverable from Ghost after this.
